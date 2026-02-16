@@ -9,6 +9,7 @@ from typing import Literal
 from isaaclab.utils import configclass
 
 from .rnd_cfg import RslRlRndCfg
+from .rle_cfg import RslRlRleCfg
 from .symmetry_cfg import RslRlSymmetryCfg
 
 
@@ -34,6 +35,15 @@ class RslRlPpoActorCriticCfg:
     activation: str = MISSING
     """The activation function for the actor and critic networks."""
 
+@configclass
+class RslRlPpoActorCriticRLECfg:
+    
+    class_name: str = "ActorCriticRLE"
+    
+    rle_feature_size: int = MISSING
+    
+    goal_embed_size: int = MISSING
+    
 
 @configclass
 class RslRlPpoAlgorithmCfg:
@@ -91,8 +101,9 @@ class RslRlPpoAlgorithmCfg:
     rnd_cfg: RslRlRndCfg | None = None
     """The configuration for the Random Network Distillation (RND) module. Default is None,
     in which case RND is not used.
-    """
-
+    """ 
+    
+    rle_cfg: RslRlRleCfg | None = None
 
 @configclass
 class RslRlOnPolicyRunnerCfg:

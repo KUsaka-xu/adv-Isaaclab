@@ -175,7 +175,7 @@ class RslRlVecEnvWrapper(VecEnv):
         # record step information
         obs_dict, rew, terminated, truncated, extras = self.env.step(actions)
         # compute dones for compatibility with RSL-RL
-        dones = (terminated | truncated).to(dtype=torch.long)
+        dones = (terminated.bool() | truncated.bool()).long()
         # move extra observations to the extras dict
         obs = obs_dict["policy"]
         extras["observations"] = obs_dict

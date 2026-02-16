@@ -47,13 +47,13 @@ def define_markers() -> VisualizationMarkers:
         markers={
             "frame": sim_utils.UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.5, 0.5, 0.5),
+                scale=(0.5, 10, 0.5),
             ),
             "arrow_x": sim_utils.UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/arrow_x.usd",
                 scale=(1.0, 0.5, 0.5),
                 visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 1.0)),
-            ),
+            ), ###
             "cube": sim_utils.CuboidCfg(
                 size=(1.0, 1.0, 1.0),
                 visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0)),

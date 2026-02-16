@@ -251,6 +251,14 @@ def action_l2(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Penalize the actions using L2 squared kernel."""
     return torch.sum(torch.square(env.action_manager.action), dim=1)
 
+def action_attack(env: ManagerBasedRLEnv) -> torch.Tensor:
+    # """Penalize the actions using L2 squared kernel."""
+    
+    # return torch.sum(torch.square(env.action_manager.action), dim=1)
+    eps = 1e-3
+    zero_mask = (env.action_manager.action.abs().sum(dim=1) < eps)
+    return zero_mask.float()
+
 
 """
 Contact sensor.
@@ -307,3 +315,22 @@ def track_ang_vel_z_exp(
     # compute the error
     ang_vel_error = torch.square(env.command_manager.get_command(command_name)[:, 2] - asset.data.root_ang_vel_b[:, 2])
     return torch.exp(-ang_vel_error / std**2)
+
+def sway_penalty_l2(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """
+    Penalize x and y axes base angular velocities to reduce wobbling, using L2-kernel.
+
+    Parameters:
+    - env: The reinforcement learning environment, e.g., IsaacLab environment instance.
+    - asset_cfg: Configuration of the robot asset.
+
+    Returns:
+    - A tensor of penalty values (shape: [num_envs]), based on the sum of squared angular velocities in x and y directions.
+    """
+    # Extract the robot asset from the environment
+    asset: RigidObject = env.scene[asset_cfg.name]
+    
+    # Compute the square of angular velocities on x and y axes
+    sway_penalty = torch.sum(torch.square(asset.data.root_ang_vel_b[:, :2]), dim=1)
+    
+    return sway_penalty

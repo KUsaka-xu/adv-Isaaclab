@@ -14,7 +14,7 @@ from collections.abc import Sequence
 from prettytable import PrettyTable
 from typing import TYPE_CHECKING
 
-from isaaclab.utils import modifiers
+from isaaclab.utils import class_to_dict, modifiers
 from isaaclab.utils.buffers import CircularBuffer
 
 from .manager_base import ManagerBase, ManagerTermBase
@@ -255,8 +255,57 @@ class ObservationManager(ManagerBase):
 
         # Cache the observations.
         self._obs_buffer = obs_buffer
+        
+        if "loco_retrain" in self._env.action_manager._terms:
+            retrain_term = self._env.action_manager._terms["loco_retrain"]
+            under_attack_ids = retrain_term.attack_ids 
+            for env_id in under_attack_ids:
+                obs_buffer["policy"][env_id, :30] += retrain_term.perturbed_obs[env_id]
+                # print(f"perturbed obs {i}: {retrain_term.perturbed_obs[i]}")
+        else:
+            pass
+        
         return obs_buffer
 
+    def compute_whole_obs(self) -> torch.Tensor:
+        """Compute the flattened observations from all groups.
+
+        Returns:
+            A tensor of shape (num_envs,) containing all flattened observations.
+        """
+        obs_list = []
+        
+        # Iterate through all groups
+        for group_name in self._group_obs_term_names:
+            group_obs = self.compute_group(group_name)
+            
+            # Handle dictionary return type
+            if isinstance(group_obs, dict):
+                # Concatenate all terms in the dictionary
+                group_tensors = list(group_obs.values())
+                # Flatten each tensor along last dimension while preserving batch dimension
+                group_tensors = [t.reshape(t.shape[0], -1) for t in group_tensors]
+                # Concatenate all terms
+                group_obs = torch.cat(group_tensors, dim=-1)
+            else:
+                # Flatten the tensor along last dimension while preserving batch dimension
+                group_obs = group_obs.reshape(group_obs.shape[0], -1)
+            
+            obs_list.append(group_obs)
+        
+        if obs_list:
+            # Concatenate all groups
+            combined_obs = torch.cat(obs_list, dim=-1)
+            # If the observation has only one feature, reshape to (num_envs,)
+            if combined_obs.shape[-1] == 1:
+                combined_obs = combined_obs.squeeze(-1)
+        else:
+            # Create empty tensor with correct shape if no observations
+            num_envs = getattr(self._env, 'num_envs', 1)
+            combined_obs = torch.zeros(num_envs, device=self._env.device)
+        
+        return combined_obs
+    
     def compute_group(self, group_name: str) -> torch.Tensor | dict[str, torch.Tensor]:
         """Computes the observations for a given group.
 

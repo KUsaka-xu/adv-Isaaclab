@@ -9,12 +9,61 @@ from isaaclab.controllers import DifferentialIKControllerCfg, OperationalSpaceCo
 from isaaclab.managers.action_manager import ActionTerm, ActionTermCfg
 from isaaclab.utils import configclass
 
-from . import binary_joint_actions, joint_actions, joint_actions_to_limits, non_holonomic_actions, task_space_actions
+from . import binary_joint_actions, joint_actions, joint_actions_to_limits, non_holonomic_actions, task_space_actions, attacker_actions_force, joint_actions_retrain
 
 ##
 # Joint actions.
 ##
 
+@configclass
+class AttackerActionsForceCfg(ActionTermCfg):
+    """Configuration for the attacker actions force term.
+
+    See :class:`AttackerActionsForce` for more details.
+    """
+    class_type: type[ActionTerm] = attacker_actions_force.AttackerActionsForce
+    scale: float = 0.25
+    offset: float | dict[str, float] = 0.0
+    
+    body_name: str = MISSING
+    joint_names: list[str] = MISSING
+    """List of joint names or regex expressions that the action will be mapped to."""
+    preserve_order: bool = True
+    """Whether to preserve the order of the joint names in the action output. Defaults to False."""
+    action_dim: int = MISSING
+    max_force: float = 20.0
+    max_command: float = 0.5
+    max_obs: float = 0.1 
+    """Maximum force norm for the action. Defaults to 20.0."""
+    use_default_offset: bool = True
+    update_rate = 0.05
+    
+    
+@configclass
+class JointActionsRetrainCfg(ActionTermCfg):
+    """Configuration for the joint action retrain term.
+
+    See :class:`JointActionRetrain` for more details.
+    """
+
+    class_type: type[ActionTerm] = joint_actions_retrain.JointActionsRetrain
+
+    joint_names: list[str] = MISSING
+    body_name: str = MISSING
+    """List of joint names or regex expressions that the action will be mapped to."""
+    scale: float | dict[str, float] = 0.25
+    """Scale factor for the action (float or dict of regex expressions). Defaults to 1.0."""
+    offset: float | dict[str, float] = 0.0
+    """Offset factor for the action (float or dict of regex expressions). Defaults to 0.0."""
+    preserve_order: bool = True
+    """Whether to preserve the order of the joint names in the action output. Defaults to False."""
+    max_force: float = 25.0
+    max_command: float = 0.5
+    max_obs: float = 0.1
+    use_default_offset: bool = True
+    under_attack_ids: float =0.0
+    update_rate = 0.05
+    attacker_policy_path: str = MISSING
 
 @configclass
 class JointActionCfg(ActionTermCfg):
@@ -31,7 +80,11 @@ class JointActionCfg(ActionTermCfg):
     """Offset factor for the action (float or dict of regex expressions). Defaults to 0.0."""
     preserve_order: bool = False
     """Whether to preserve the order of the joint names in the action output. Defaults to False."""
-
+    max_force: float = 25.0
+    max_command: float = 0.5
+    max_obs: float = 0.1
+    under_attack_ids: float =0.05
+    update_rate = 0.05
 
 @configclass
 class JointPositionActionCfg(JointActionCfg):

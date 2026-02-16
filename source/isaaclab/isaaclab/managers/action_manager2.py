@@ -197,11 +197,7 @@ class ActionManager(ManagerBase):
         self._action_loco = torch.zeros((self.num_envs, 12), device=self.device)
         self._prev_action = torch.zeros_like(self._action)
 
-        
-        #self.model = torch.jit.load('/home/saka/robot_lab/scripts/rsl_rl/base/logs/rsl_rl/unitree_go2_rough/2025-08-05_19-11-38/exported/policy.pt')
-        #self.model = torch.jit.load('/home/saka/robot_lab/scripts/rsl_rl/base/logs/rsl_rl/baseline/exported/policy.pt')
-        self.model = torch.jit.load('/home/saka/robot_lab/scripts/rsl_rl/base/logs/rsl_rl/loco_asymmetric/2025-07-15_15-45-59_5%/exported/policy.pt') # 非对称
-        #self.model = torch.jit.load('/home/saka/robot_lab/scripts/rsl_rl/base/logs/rsl_rl/unitree_go2_rough/2025-06-05_19-11-38/exported/policy.pt')
+        self.model = torch.jit.load("scripts/rsl_rl/base/logs/rsl_rl/unitree_go2_rough/2025-05-26_18-59-05/exported/policy.pt")
         self.model.eval()
         
         # check if any term has debug visualization implemented
@@ -256,7 +252,7 @@ class ActionManager(ManagerBase):
     @property
     def observations(self) -> torch.Tensor:
         whole_obs = self._env.observation_manager.compute_whole_obs()
-        obs_loco = whole_obs[:, :45]
+        obs_loco = whole_obs[:, :235]
         return obs_loco
 
     @property

@@ -19,7 +19,7 @@ from isaaclab.assets import Articulation, RigidObject
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers.manager_base import ManagerTermBase
 from isaaclab.managers.manager_term_cfg import ObservationTermCfg
-from isaaclab.sensors import Camera, Imu, RayCaster, RayCasterCamera, TiledCamera
+from isaaclab.sensors import Camera, Imu, RayCaster, RayCasterCamera, TiledCamera, ContactSensor
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv, ManagerBasedRLEnv
@@ -234,7 +234,7 @@ def imu_lin_acc(env: ManagerBasedEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg
 def image(
     env: ManagerBasedEnv,
     sensor_cfg: SceneEntityCfg = SceneEntityCfg("tiled_camera"),
-    data_type: str = "rgb",
+    data_type: str = "distance_to_camera",
     convert_perspective_to_orthogonal: bool = False,
     normalize: bool = True,
 ) -> torch.Tensor:
@@ -529,3 +529,88 @@ Commands.
 def generated_commands(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:
     """The generated command from command term in the command manager with the given name."""
     return env.command_manager.get_command(command_name)
+
+
+# -----------------------privileged observations-----------------------
+
+def sensor_contact_forces(
+    env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
+    """Get the contact forces from the contact sensor."""
+    # extract the used quantities (to enable type-hinting)
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    return contact_sensor.data.net_forces_w[:, sensor_cfg.body_ids, :].flatten(start_dim=1)
+
+# def center_of_mass(
+#     env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+# ) -> torch.Tensor:
+#     """Get the center of mass of the asset in the environment frame."""
+#     # extract the used quantities (to enable type-hinting)
+#     asset: RigidObject = env.scene[asset_cfg.name]
+#     return asset.data.center_of_mass_w - env.scene.env_origins  # [num_envs, 3]
+
+def feet_air(
+    env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg
+) -> torch.Tensor:
+    """Get the feet air time of the asset."""
+    # extract the used quantities (to enable type-hinting)
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    current_air_time = contact_sensor.data.current_air_time[:, sensor_cfg.body_ids]
+    return current_air_time
+
+def joint_contact_judge(
+    env: ManagerBasedRLEnv,sensor_cfg: SceneEntityCfg, threshold: float 
+) -> torch.Tensor:
+    """Get the joint contact forces of the asset."""
+   
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    net_contact_forces = contact_sensor.data.net_forces_w_history
+    contact_force = torch.max(torch.norm(net_contact_forces[:, :, sensor_cfg.body_ids], dim=-1), dim=1)[0] > threshold
+    return contact_force#只要thigh和shank
+
+def joint_contact_force(
+    env: ManagerBasedRLEnv,sensor_cfg: SceneEntityCfg, threshold: float 
+) -> torch.Tensor:
+    """Get the joint contact forces of the asset."""
+   
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    net_contact_forces = contact_sensor.data.net_forces_w_history
+    contact_force = torch.max(torch.norm(net_contact_forces[:, :, sensor_cfg.body_ids], dim=-1), dim=1)[0] - threshold
+    return contact_force#只要thigh和shank
+
+
+
+
+#-------------------------------------------------
+
+def last_action_loco(env: ManagerBasedEnv, action_name: str | None = None) -> torch.Tensor:
+    
+
+    return env.action_manager.action_loco
+
+
+def image_features_term(
+    env,
+    sensor_cfg: SceneEntityCfg = SceneEntityCfg("camera"),
+    model_name: str = "resnet18",
+    data_type: str = "distance_to_camera"
+):
+    # 初始化 image_features term
+    if not hasattr(env, "_image_features_term"):
+        cfg = type("cfg", (), {})()
+        cfg.params = {
+            "sensor_cfg": sensor_cfg,
+            "model_name": model_name,
+            "model_device": env.device,
+            "data_type": data_type  
+        }
+        env._image_features_term = image_features(cfg, env)
+        env._image_features_term.reset()
+    
+    # 获取 features
+    features = env._image_features_term(
+        env,
+        sensor_cfg=sensor_cfg,
+        model_name=model_name,
+        data_type=data_type
+    )
+    return features

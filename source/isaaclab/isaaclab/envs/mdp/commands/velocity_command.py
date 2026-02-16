@@ -17,6 +17,8 @@ import isaaclab.utils.math as math_utils
 from isaaclab.assets import Articulation
 from isaaclab.managers import CommandTerm
 from isaaclab.markers import VisualizationMarkers
+from isaaclab.envs.mdp.actions.attacker_actions_force import AttackerActionsForce
+
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv
@@ -121,14 +123,48 @@ class UniformVelocityCommand(CommandTerm):
         )
 
     def _resample_command(self, env_ids: Sequence[int]):
+        
         # sample velocity commands
         r = torch.empty(len(env_ids), device=self.device)
-        # -- linear velocity - x direction
-        self.vel_command_b[env_ids, 0] = r.uniform_(*self.cfg.ranges.lin_vel_x)
-        # -- linear velocity - y direction
-        self.vel_command_b[env_ids, 1] = r.uniform_(*self.cfg.ranges.lin_vel_y)
-        # -- ang vel yaw - rotation around z
-        self.vel_command_b[env_ids, 2] = r.uniform_(*self.cfg.ranges.ang_vel_z)
+        
+        if "attck_force" in self._env.action_manager._terms:
+            
+            attacker_term = self._env.action_manager._terms["attck_force"]
+            adv_command = attacker_term.adv_command  # shape = (num_envs, 3)
+
+            self.vel_command_b[env_ids] = adv_command[env_ids]
+
+        else:
+            # -- linear velocity - x direction
+            self.vel_command_b[env_ids, 0] = r.uniform_(*self.cfg.ranges.lin_vel_x)
+            # -- linear velocity - y direction
+            self.vel_command_b[env_ids, 1] = r.uniform_(*self.cfg.ranges.lin_vel_y)
+            # -- ang vel yaw - rotation around z
+            self.vel_command_b[env_ids, 2] = r.uniform_(*self.cfg.ranges.ang_vel_z)      
+        
+        if "loco_retrain" in self._env.action_manager._terms:
+            
+            retrain_term = self._env.action_manager._terms["loco_retrain"]
+            adv_retrain_command = retrain_term.adv_command  # shape = (num_envs, 3)
+            under_attack_ids = retrain_term.attack_ids  
+            
+            self.vel_command_b[env_ids, 0] = r.uniform_(*self.cfg.ranges.lin_vel_x)
+            # -- linear velocity - y direction
+            self.vel_command_b[env_ids, 1] = r.uniform_(*self.cfg.ranges.lin_vel_y)
+            # -- ang vel yaw - rotation around z
+            self.vel_command_b[env_ids, 2] = r.uniform_(*self.cfg.ranges.ang_vel_z)
+            
+            for env_id in under_attack_ids:
+                
+                self.vel_command_b[env_id, :] = adv_retrain_command[env_id, :]
+                
+ 
+        # self.vel_command_b[env_ids, 0] = r.uniform_(*self.cfg.ranges.lin_vel_x)
+        # # -- linear velocity - y direction
+        # self.vel_command_b[env_ids, 1] = r.uniform_(*self.cfg.ranges.lin_vel_y)
+        # # -- ang vel yaw - rotation around z
+        # self.vel_command_b[env_ids, 2] = r.uniform_(*self.cfg.ranges.ang_vel_z)            
+        
         # heading target
         if self.cfg.heading_command:
             self.heading_target[env_ids] = r.uniform_(*self.cfg.ranges.heading)
@@ -136,7 +172,7 @@ class UniformVelocityCommand(CommandTerm):
             self.is_heading_env[env_ids] = r.uniform_(0.0, 1.0) <= self.cfg.rel_heading_envs
         # update standing envs
         self.is_standing_env[env_ids] = r.uniform_(0.0, 1.0) <= self.cfg.rel_standing_envs
-
+     
     def _update_command(self):
         """Post-processes the velocity command.
 

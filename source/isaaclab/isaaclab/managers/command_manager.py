@@ -178,8 +178,21 @@ class CommandTerm(ManagerTermBase):
         Args:
             env_ids: The list of environment IDs to resample.
         """
+        # if len(env_ids) != 0:
+        #     if "loco_retrain" in self._env.action_manager._terms:
+        #         retrain_term = self._env.action_manager._terms["loco_retrain"]
+        #         under_attack_ids = retrain_term.attack_ids 
+        #         if env_ids == under_attack_ids:
+        #             self.time_left[env_ids] = self.time_left[env_ids].uniform_(*self.cfg.resampling_time_range_adv)
+        #             print(1111111111111111)
+        #         else:
+        #             self.time_left[env_ids] = self.time_left[env_ids].uniform_(*self.cfg.resampling_time_range)
+        #             print(2222222222222222)
+        #     # resample the time left before resampling
+        #     else:
+        #         self.time_left[env_ids] = self.time_left[env_ids].uniform_(*self.cfg.resampling_time_range)
+        #         print(233333332)
         if len(env_ids) != 0:
-            # resample the time left before resampling
             self.time_left[env_ids] = self.time_left[env_ids].uniform_(*self.cfg.resampling_time_range)
             # increment the command counter
             self.command_counter[env_ids] += 1

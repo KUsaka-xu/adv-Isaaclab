@@ -156,3 +156,49 @@ def illegal_contact(env: ManagerBasedRLEnv, threshold: float, sensor_cfg: SceneE
     return torch.any(
         torch.max(torch.norm(net_contact_forces[:, :, sensor_cfg.body_ids], dim=-1), dim=1)[0] > threshold, dim=1
     )
+
+def air_time_violation(
+    env: ManagerBasedRLEnv,
+    threshold: float,
+    sensor_cfg: SceneEntityCfg
+) -> torch.Tensor:
+    """Terminate when any foot's air‐time exceeds the given threshold."""
+    
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    # 上一次落地前的悬空时间 (shape: [num_envs, num_feet])
+    last_air_time = contact_sensor.data.last_air_time[:, sensor_cfg.body_ids]
+    
+    return torch.any(last_air_time > threshold, dim=1)
+
+def wheel_pair_height_diff_violation(
+    env: ManagerBasedRLEnv,
+    threshold: float,
+    asset_cfg: SceneEntityCfg,
+    left_wheel_name: str,
+    right_wheel_name: str
+) -> torch.Tensor:
+    """Terminate when the y‑axis height difference between two wheel bodies exceeds threshold.
+
+    left_wheel_name  — 匹配左轮关节名称的正则表达式
+    right_wheel_name — 匹配右轮关节名称的正则表达式
+    asset_cfg.name   — 场景中 Articulation 的名称（如 "robot"）
+    """
+    asset: Articulation = env.scene[asset_cfg.name]
+    # body_pos_w.shape == [num_envs, num_bodies, 3]
+    body_pos = asset.data.body_pos_w
+
+    left_ids = asset.find_joints(left_wheel_name)
+    right_ids = asset.find_joints(right_wheel_name)
+    if len(left_ids) != 1 or len(right_ids) != 1:
+        raise ValueError(
+            f"wheel_pair_height_diff_violation: 找到的左右轮关节数量不唯一 "
+            f"left({left_wheel_name})={left_ids}, right({right_wheel_name})={right_ids}"
+        )
+    left_id = left_ids[0]
+    right_id = right_ids[0]
+
+    # world-frame y 轴高度
+    y_left = body_pos[:, left_id, 1]
+    y_right = body_pos[:, right_id, 1]
+
+    return torch.abs(y_left - y_right) > threshold

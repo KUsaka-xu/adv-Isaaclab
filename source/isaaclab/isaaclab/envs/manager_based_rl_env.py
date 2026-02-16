@@ -21,7 +21,9 @@ from isaaclab.ui.widgets import ManagerLiveVisualizer
 from .common import VecEnvStepReturn
 from .manager_based_env import ManagerBasedEnv
 from .manager_based_rl_env_cfg import ManagerBasedRLEnvCfg
+import wandb
 
+from rsl_rl.modules.rle import RLEModel
 
 class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
     """The superclass for the manager-based workflow reinforcement learning-based environments.
@@ -88,6 +90,15 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
 
         print("[INFO]: Completed setting up the environment...")
 
+        # wandb.init(
+        #     project="robotlab",
+        #     name="action",
+        #     config=cfg.to_dict(),
+        # )
+        self.reset_terminated = torch.zeros(self.num_envs, device=self.device, dtype=torch.bool)
+        self.reset_time_outs = torch.zeros(self.num_envs, device=self.device, dtype=torch.bool)
+        self.whole_attack = 0
+        self.success_attack = 0
     """
     Properties.
     """
@@ -171,7 +182,27 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         """
         # process actions
         self.action_manager.process_action(action.to(self.device))
-
+        # actions0 = self.action_manager.action[:, 0]
+        # actions1 = self.action_manager.action[:, 1]
+        # actions2 = self.action_manager.action[:, 2]
+        # wandb.log(
+        #     {
+        #         "action1/mean": actions0.mean().item(),
+        #         "action1/std": actions0.std().item(),
+        #         "action1/min": actions0.min().item(),
+        #         "action1/max": actions0.max().item(),
+        #         "action2/mean": actions1.mean().item(),
+        #         "action2/std": actions1.std().item(),
+        #         "action2/min": actions1.min().item(),
+        #         "action2/max": actions1.max().item(),
+        #         "action3/mean": actions2.mean().item(),
+        #         "action3/std": actions2.std().item(),
+        #         "action3/min": actions2.min().item(),
+        #         "action3/max": actions2.max().item(),
+        #     },
+        #     step=self.common_step_counter
+        # )
+        
         self.recorder_manager.record_pre_step()
 
         # check if we need to do rendering within the physics loop
@@ -179,7 +210,7 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         is_rendering = self.sim.has_gui() or self.sim.has_rtx_sensors()
 
         # perform physics stepping
-        for _ in range(self.cfg.decimation):
+        for _ in range(self.cfg.decimation): # decimation 4
             self._sim_step_counter += 1
             # set actions into buffers
             self.action_manager.apply_action()
@@ -194,7 +225,6 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
                 self.sim.render()
             # update buffers at sim dt
             self.scene.update(dt=self.physics_dt)
-
         # post-step:
         # -- update env counters (used for curriculum generation)
         self.episode_length_buf += 1  # step in current episode (per env)
@@ -228,7 +258,6 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
 
             # trigger recorder terms for post-reset calls
             self.recorder_manager.record_post_reset(reset_env_ids)
-
         # -- update command
         self.command_manager.compute(dt=self.step_dt)
         # -- step interval events
@@ -237,7 +266,6 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         # -- compute observations
         # note: done after reset to get the correct observations for reset envs
         self.obs_buf = self.observation_manager.compute()
-
         # return observations, rewards, resets and extras
         return self.obs_buf, self.reward_buf, self.reset_terminated, self.reset_time_outs, self.extras
 
@@ -350,6 +378,17 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         Args:
             env_ids: List of environment ids which must be reset
         """
+        # for idx in env_ids:
+        #     idx = int(idx)
+                      
+        #     if self.reset_terminated[idx]:  
+        #         self.success_attack += 1
+        #     elif self.reset_time_outs[idx]:  
+        #         self.whole_attack += 1
+        
+        # print(f"Be terminated: {self.success_attack / (self.whole_attack + self.success_attack+0.00001) * 100:.2f}%")    
+        
+        
         # update the curriculum for environments that need a reset
         self.curriculum_manager.compute(env_ids=env_ids)
         # reset the internal buffers of the scene elements
